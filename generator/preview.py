@@ -38,6 +38,8 @@ def escribir(job: Path, meta: dict):
         imgs += f"<figure><img src='{nombre}' alt='{nombre}'><figcaption>{nombre}</figcaption></figure>"
 
     ios = ' ios-src="model.usdz"' if (job / "model.usdz").exists() else ""
+    # floor por defecto; los perfiles especializados lo pisan (una repisa va a la pared)
+    colocacion = meta.get("ar_placement", "floor")
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -67,7 +69,7 @@ def escribir(job: Path, meta: dict):
  · {meta.get('vistas', 1)} vista(s) → Meshy {meta.get('meshy', {}).get('endpoint', '')}</p>
 
 <model-viewer src="model.glb"{ios} alt="{meta.get('nombre', 'modelo')}"
-  ar ar-modes="webxr scene-viewer quick-look" ar-scale="fixed"
+  ar ar-modes="webxr scene-viewer quick-look" ar-scale="fixed" ar-placement="{colocacion}"
   camera-controls touch-action="pan-y" shadow-intensity="1" exposure="1"
   environment-image="neutral" poster-color="transparent"></model-viewer>
 

@@ -89,8 +89,12 @@ def _texto_de_respuesta(resp):
     raise RuntimeError(f"respuesta sin texto: {json.dumps(resp)[:400]}")
 
 
-def detectar(imagen: Path, modelo=None):
-    """Mira la foto y devuelve {objetos, ambiguo, resumen, usage, modelo}."""
+def consultar_vision(imagen: Path, instruccion, esquema, nombre="respuesta", modelo=None):
+    """
+    Primitiva de visión: manda la foto + una instrucción y devuelve el JSON validado
+    contra `esquema`. Es el punto de extensión para perfiles especializados (p. ej.
+    generator_muebles pide, en la misma llamada, la categoría de mueble).
+    """
     clave = config.exigir(config.OPENAI_API_KEY, "OPENAI_API_KEY")
     modelo = modelo or config.OPENAI_VISION_MODEL
     cuerpo = {
@@ -98,20 +102,25 @@ def detectar(imagen: Path, modelo=None):
         "input": [{
             "role": "user",
             "content": [
-                {"type": "input_text", "text": INSTRUCCION},
+                {"type": "input_text", "text": instruccion},
                 {"type": "input_image", "image_url": _data_uri(imagen)},
             ],
         }],
-        "text": {"format": {"type": "json_schema", "name": "objetos_de_la_escena",
-                            "schema": ESQUEMA, "strict": True}},
+        "text": {"format": {"type": "json_schema", "name": nombre,
+                            "schema": esquema, "strict": True}},
     }
-    print(f"  [visión] {modelo}: identificando objetos…")
     resp = net.post_json(f"{config.OPENAI_BASE}/responses", cuerpo,
                          {"Authorization": f"Bearer {clave}"}, timeout=300)
     datos = json.loads(_texto_de_respuesta(resp))
     datos["modelo"] = modelo
     datos["usage"] = resp.get("usage", {})
     return datos
+
+
+def detectar(imagen: Path, modelo=None):
+    """Mira la foto y devuelve {objetos, ambiguo, resumen, usage, modelo}."""
+    print(f"  [visión] {modelo or config.OPENAI_VISION_MODEL}: identificando objetos…")
+    return consultar_vision(imagen, INSTRUCCION, ESQUEMA, "objetos_de_la_escena", modelo)
 
 
 def cargar_o_detectar(imagen: Path, carpeta: Path, forzar=False):

@@ -27,3 +27,8 @@ training/floor_textures/*.jpg
 training/floor_textures/*.png
 training/models/shoes/
 training/data_angles/
+
+# generador de modelos 3D (claves y salidas de cada job)
+generator/.env
+generator/jobs/
+generator/pruebas/

@@ -1,15 +1,24 @@
-# Railway construye con Nixpacks. Hacen falta dos runtimes:
-#   Python  el pipeline y el servicio
-#   Node    @gltf-transform/cli, que produce model_web.glb — el archivo que
-#           WordPress importa (draco + webp, suele quedar bajo 1 MB)
+# Railway construye con Nixpacks.
+#
+# Los nombres de paquete son los de la revisión de nixpkgs que Nixpacks tiene
+# fijada, no los de la última. "nodejs_22" no existe ahí y el build falla al
+# evaluar. Se usa "nodejs" a secas, que es un alias estable de toda la vida y
+# apunta a la versión LTS de esa revisión: al pipeline le da igual cuál sea.
 [phases.setup]
-nixPkgs = ["python313", "nodejs_22"]
+nixPkgs = ["python313", "nodejs"]
 
 [phases.install]
 cmds = [
   "python -m venv /opt/venv",
   ". /opt/venv/bin/activate && pip install -r service/requirements.txt",
-  "npm install -g @gltf-transform/cli",
+  # gltf-transform produce model_web.glb, que es el archivo que importa
+  # WordPress (draco + webp, suele quedar bajo 1 MB contra 2-3 del original).
+  #
+  # El "|| true" es deliberado: si npm falla, el despliegue NO debe caerse. El
+  # pipeline ya contempla que npx no esté y en ese caso se queda con model.glb
+  # sin optimizar. Perder la compresión es un inconveniente; no poder desplegar
+  # es un bloqueo.
+  "npm install -g @gltf-transform/cli || true",
 ]
 
 [start]

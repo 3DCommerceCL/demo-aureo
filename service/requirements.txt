@@ -1,0 +1,5 @@
+# El pipeline es biblioteca estándar salvo estas dos, que usan la corrección de
+# proporción, el control de calidad de la imagen y el recorte de fondo — o sea,
+# justo lo que hace bueno al generador.
+Pillow
+numpy

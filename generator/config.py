@@ -10,6 +10,10 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
 JOBS_DIR = Path(os.environ.get("GEN3D_JOBS_DIR", RAIZ / "jobs"))
+# Las variantes de imagen del paso 1 también salen del paquete cuando el
+# generador corre en un contenedor: ahí el disco es efímero y perder una
+# variante ya pagada por un redespliegue no tiene sentido.
+PRUEBAS_DIR = Path(os.environ.get("GEN3D_PRUEBAS_DIR", RAIZ / "pruebas"))
 ENV_FILE = RAIZ / ".env"
 
 

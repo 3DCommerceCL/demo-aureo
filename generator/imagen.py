@@ -58,7 +58,7 @@ def elegir_lienzo(a, vista, dims):
         return config.OPENAI_IMAGE_SIZE
     return min(LIENZOS, key=lambda n: abs(math.log(LIENZOS[n] / objetivo)))
 
-PRUEBAS_DIR = config.RAIZ / "pruebas"
+PRUEBAS_DIR = config.PRUEBAS_DIR
 EXTENSIONES = {".jpg", ".jpeg", ".png", ".webp"}
 
 

@@ -1,0 +1,18 @@
+# Railway construye con Nixpacks. Hacen falta dos runtimes:
+#   Python  el pipeline y el servicio
+#   Node    @gltf-transform/cli, que produce model_web.glb — el archivo que
+#           WordPress importa (draco + webp, suele quedar bajo 1 MB)
+[phases.setup]
+nixPkgs = ["python313", "nodejs_22"]
+
+[phases.install]
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate && pip install -r service/requirements.txt",
+  "npm install -g @gltf-transform/cli",
+]
+
+[start]
+# 0.0.0.0 y el PORT que inyecta Railway: escuchar en un puerto fijo o en
+# 127.0.0.1 es el fallo de despliegue más común.
+cmd = ". /opt/venv/bin/activate && python -m service.app"

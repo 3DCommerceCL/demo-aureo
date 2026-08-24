@@ -1,0 +1,14 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": { "builder": "NIXPACKS" },
+  "deploy": {
+    "//": "Railway espera a que /health responda antes de mandarle tráfico. Sin esto, un despliegue puede recibir peticiones mientras todavía arranca.",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 60,
+    "//2": "Un trabajo largo no debe morir por un reinicio caprichoso; y si el proceso cae, que vuelva solo.",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5,
+    "//3": "Una sola instancia a propósito: el estado de los trabajos vive en el volumen, y dos instancias escribiendo el mismo job.json se pisarían.",
+    "numReplicas": 1
+  }
+}

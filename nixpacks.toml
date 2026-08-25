@@ -1,27 +1,36 @@
 # Railway construye con Nixpacks.
 #
-# Los nombres de paquete son los de la revisión de nixpkgs que Nixpacks tiene
-# fijada, no los de la última. "nodejs_22" no existe ahí y el build falla al
-# evaluar. Se usa "nodejs" a secas, que es un alias estable de toda la vida y
-# apunta a la versión LTS de esa revisión: al pipeline le da igual cuál sea.
+# NOMBRES DE PAQUETE: son los de la revisión de nixpkgs que Nixpacks tiene
+# fijada, no los de la última. Ya falló una vez con "nodejs_22", que en esa
+# revisión no existe. Y si esa revisión es anterior a finales de 2024, tampoco
+# conoce "python313" (Python 3.13 salió en octubre de ese año).
+#
+# Por eso se usan los alias sin versión: "python3" y "nodejs" existen en
+# cualquier revisión y apuntan a la versión estable de cada una. Al servicio le
+# basta con Python 3.10 o superior, y a gltf-transform le da igual la versión de
+# Node.
 [phases.setup]
-nixPkgs = ["python313", "nodejs"]
+nixPkgs = ["python3", "nodejs"]
 
 [phases.install]
 cmds = [
-  "python -m venv /opt/venv",
-  ". /opt/venv/bin/activate && pip install -r service/requirements.txt",
+  # python3, no python: nixpkgs instala el binario versionado y el alias
+  # "python" a secas puede no existir.
+  "python3 -m venv /opt/venv",
+  "/opt/venv/bin/pip install --upgrade pip",
+  "/opt/venv/bin/pip install -r service/requirements.txt",
   # gltf-transform produce model_web.glb, que es el archivo que importa
-  # WordPress (draco + webp, suele quedar bajo 1 MB contra 2-3 del original).
-  #
-  # El "|| true" es deliberado: si npm falla, el despliegue NO debe caerse. El
-  # pipeline ya contempla que npx no esté y en ese caso se queda con model.glb
+  # WordPress. El "|| true" es deliberado: si npm falla, el despliegue NO debe
+  # caerse. El pipeline ya contempla que npx no esté y se queda con model.glb
   # sin optimizar. Perder la compresión es un inconveniente; no poder desplegar
   # es un bloqueo.
   "npm install -g @gltf-transform/cli || true",
 ]
 
 [start]
-# 0.0.0.0 y el PORT que inyecta Railway: escuchar en un puerto fijo o en
-# 127.0.0.1 es el fallo de despliegue más común.
-cmd = ". /opt/venv/bin/activate && python -m service.app"
+# Se invoca el intérprete del venv por ruta absoluta, sin depender de "activate"
+# ni de qué shell use la plataforma.
+#
+# El servicio escucha en 0.0.0.0 y en el PORT que inyecta Railway: usar un
+# puerto fijo o 127.0.0.1 es el fallo de despliegue más común.
+cmd = "/opt/venv/bin/python -m service.app"

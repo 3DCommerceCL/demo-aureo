@@ -70,6 +70,27 @@ def url_publica() -> str:
     return f"http://127.0.0.1:{os.environ.get('PORT', '8080')}"
 
 
+def _es_persistente(ruta) -> bool:
+    """
+    ¿La carpeta de trabajos está sobre un volumen montado?
+
+    Se recorre hacia arriba buscando un punto de montaje: el volumen se monta en
+    /data pero los trabajos van en /data/jobs, que es un subdirectorio normal.
+    La raíz no cuenta: si se llega hasta "/" es que no hay volumen y todo vive
+    en el disco efímero del contenedor.
+    """
+    try:
+        actual = Path(ruta).resolve()
+        while True:
+            if os.path.ismount(actual):
+                return str(actual) != actual.anchor
+            if actual.parent == actual:
+                return False
+            actual = actual.parent
+    except OSError:
+        return False
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "AureoGen/1.0"
 
@@ -186,6 +207,11 @@ class Handler(BaseHTTPRequestHandler):
             },
             "jobs_dir": str(config.JOBS_DIR),
             "pruebas_dir": str(config.PRUEBAS_DIR),
+            # ¿Hay un volumen de verdad montado, o son carpetas dentro del
+            # contenedor? Que la ruta sea /data/jobs solo dice que la variable
+            # está puesta. Sin volumen, un redespliegue borra trabajos ya
+            # pagados, y averiguarlo por las malas cuesta 30 créditos.
+            "almacenamiento_persistente": _es_persistente(config.JOBS_DIR),
         })
 
     def _ver_trabajo(self, slug):

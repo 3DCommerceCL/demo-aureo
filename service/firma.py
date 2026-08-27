@@ -15,8 +15,9 @@ El esquema tiene que ser idéntico al del plugin
 
 import hashlib
 import hmac
-import os
 import time
+
+from generator import config
 
 VENTANA_S = 300  # tolerancia de reloj y vida útil de una firma
 
@@ -26,7 +27,10 @@ class SinClave(RuntimeError):
 
 
 def clave() -> bytes:
-    k = os.environ.get("AUREO_SHARED_KEY", "")
+    # config.var() y no os.environ: si en el panel se pegó
+    # `AUREO_SHARED_KEY=…` entero en el valor, la firma no coincidiría
+    # nunca y el síntoma sería un 401 en cada petición de WordPress.
+    k = config.var("AUREO_SHARED_KEY")
     if not k:
         raise SinClave(
             "falta AUREO_SHARED_KEY: es la clave compartida con WordPress, "

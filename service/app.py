@@ -60,11 +60,11 @@ PREFIJOS_PNG = ("vista_",)
 
 def url_publica() -> str:
     """URL con la que el servicio se nombra a sí mismo en las URLs de archivos."""
-    u = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+    u = config.var("PUBLIC_URL").rstrip("/")
     if u:
         return u
     # Railway expone el dominio generado en esta variable.
-    dominio = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+    dominio = config.var("RAILWAY_PUBLIC_DOMAIN")
     if dominio:
         return f"https://{dominio}"
     return f"http://127.0.0.1:{os.environ.get('PORT', '8080')}"
@@ -200,10 +200,16 @@ class Handler(BaseHTTPRequestHandler):
         self._json(200, {
             "ok": True,
             "servicio": "aureo-generador",
+            # No basta con decir si la clave está puesta. Una clave presente
+            # pero mal pegada —la línea entera del .env dentro del campo del
+            # valor— daba un /health en verde y un 401 en la primera llamada a
+            # OpenAI. Acá se informa el formato, que es lo que se rompe.
             "claves": {
-                "openai": bool(config.OPENAI_API_KEY),
-                "meshy": bool(config.MESHY_API_KEY),
-                "compartida": bool(os.environ.get("AUREO_SHARED_KEY")),
+                "openai": config.revisar_clave("OPENAI_API_KEY", config.OPENAI_API_KEY),
+                "meshy": config.revisar_clave("MESHY_API_KEY", config.MESHY_API_KEY),
+                "compartida": config.revisar_clave(
+                    "AUREO_SHARED_KEY", config.var("AUREO_SHARED_KEY")
+                ),
             },
             "jobs_dir": str(config.JOBS_DIR),
             "pruebas_dir": str(config.PRUEBAS_DIR),
@@ -427,12 +433,12 @@ def main():
 
     puerto = int(os.environ.get("PORT", "8080"))
 
-    faltan = [v for v in ("AUREO_SHARED_KEY", "OPENAI_API_KEY", "MESHY_API_KEY")
-              if not os.environ.get(v)]
-    if faltan:
-        # Se avisa pero no se aborta: /health tiene que poder responder para que
-        # se vea desde afuera qué falta, en vez de un contenedor que no arranca.
-        print(f"AVISO: faltan variables: {', '.join(faltan)}", file=sys.stderr)
+    # Se avisa pero no se aborta: /health tiene que poder responder para que se
+    # vea desde afuera qué pasa, en vez de un contenedor que no arranca.
+    for nombre in ("AUREO_SHARED_KEY", "OPENAI_API_KEY", "MESHY_API_KEY"):
+        estado_clave = config.revisar_clave(nombre, config.var(nombre))
+        if estado_clave["formato"] != "ok":
+            print(f"AVISO: {nombre}: {estado_clave['formato']}", file=sys.stderr)
 
     config.JOBS_DIR.mkdir(parents=True, exist_ok=True)
     config.PRUEBAS_DIR.mkdir(parents=True, exist_ok=True)

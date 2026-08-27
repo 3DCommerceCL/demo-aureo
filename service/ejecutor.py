@@ -79,6 +79,18 @@ def _mensaje_humano(e: Exception) -> str:
     texto = str(e).strip() or e.__class__.__name__
     if "OPENAI_API_KEY" in texto or "MESHY_API_KEY" in texto:
         return "El servicio de generación no tiene configuradas sus claves de API."
+
+    # Un 401/403 del proveedor es siempre la clave, no la foto ni las medidas.
+    # Se traduce en vez de reenviar el cuerpo crudo: ese cuerpo trae la clave
+    # rechazada parcialmente enmascarada, y terminaba impresa en el admin de
+    # WordPress a la vista de cualquiera que abriera el trabajo.
+    if getattr(e, "codigo", None) in (401, 403):
+        proveedor = "OpenAI" if "openai" in texto.lower() else "Meshy"
+        return (
+            f"El servicio de generación no pudo autenticarse con {proveedor}: "
+            "la clave de API es incorrecta o está vencida. Revisá las variables "
+            "del servicio (consultá /health para ver el diagnóstico)."
+        )
     if "timed out" in texto.lower() or "timeout" in texto.lower():
         return "La reconstrucción tardó más de lo permitido y se canceló."
     return texto[:300]

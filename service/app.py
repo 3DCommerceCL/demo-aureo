@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -37,6 +38,10 @@ from . import ejecutor, estado, firma, multipart
 
 RUTA_JOB = re.compile(r"^/v1/jobs/([A-Za-z0-9._-]+)(?:/([a-z]+))?$")
 RUTA_FILE = re.compile(r"^/files/([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)$")
+# Las variantes de imagen del paso 1 viven en la carpeta de pruebas, no en la
+# del trabajo, así que tienen su propia ruta. Solo los NNN_*.png que lista la
+# instantánea: el resto de esa carpeta (input.png, index.html) no se entrega.
+RUTA_VARIANTE = re.compile(r"^/files/([A-Za-z0-9._-]+)/variantes/(\d{3}_[A-Za-z0-9._-]+\.png)$")
 
 # QUÉ se puede descargar de la carpeta de un trabajo.
 #
@@ -141,6 +146,12 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/health" or self.path == "/":
                 return self._salud()
 
+            m = RUTA_VARIANTE.match(self.path.split("?")[0])
+            if m:
+                if not self._autenticado(b""):
+                    return
+                return self._servir_variante(m.group(1), m.group(2))
+
             m = RUTA_FILE.match(self.path.split("?")[0])
             if m:
                 if not self._autenticado(b""):
@@ -223,6 +234,12 @@ class Handler(BaseHTTPRequestHandler):
         })
 
     def _ver_trabajo(self, slug):
+        # 404 y no una instantánea vacía: sin esta comprobación, preguntar por
+        # un trabajo que el servicio no conoce devolvía 200 con estado "draft",
+        # y WordPress lo copiaba tal cual. Un trabajo en curso pasaba a "Sin
+        # enviar" por un error de tipeo en el nombre o por una carpeta perdida.
+        if not estado.existe(slug):
+            return self._error(404, "Ese trabajo no existe.")
         self._json(200, estado.snapshot(slug, url_publica()))
 
     def _crear_trabajo(self):
@@ -396,6 +413,21 @@ class Handler(BaseHTTPRequestHandler):
         ejecutor.lanzar_rehacer(slug, url_publica(), desde)
         self._json(200, estado.snapshot(slug, url_publica()))
 
+    def _servir_variante(self, slug, nombre):
+        # El patrón de la ruta ya acota el nombre a NNN_*.png; igual se
+        # resuelve y se comprueba que quede dentro de la carpeta de pruebas.
+        carpeta = estado.carpeta_pruebas(slug).resolve()
+        ruta = (carpeta / nombre).resolve()
+        if not str(ruta).startswith(str(carpeta)) or not ruta.is_file():
+            return self._error(404, "Ese archivo no existe.")
+
+        datos = ruta.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(datos)))
+        self.end_headers()
+        self.wfile.write(datos)
+
     def _servir_archivo(self, slug, nombre):
         # El nombre ya viene acotado por la expresión de la ruta (sin barras ni
         # puntos dobles). Los entregables finales viven en la carpeta del
@@ -456,6 +488,14 @@ def main():
     print(f"servicio en 0.0.0.0:{puerto} · público: {url_publica()}", flush=True)
     print(f"  trabajos: {config.JOBS_DIR}", flush=True)
     print(f"  variantes: {config.PRUEBAS_DIR}", flush=True)
+
+    # En un hilo y no en línea: reconciliar avisa a WordPress por cada trabajo
+    # que cierra, y cada aviso puede tardar hasta 20 s si el sitio no responde.
+    # Hacerlo antes de escuchar retrasaría el arranque lo bastante como para que
+    # el chequeo de salud de la plataforma dé el despliegue por fallido.
+    threading.Thread(
+        target=ejecutor.reconciliar, args=(url_publica(),), daemon=True
+    ).start()
 
     # 0.0.0.0 y no 127.0.0.1: dentro de un contenedor hay que escuchar en todas
     # las interfaces o el enrutador de la plataforma no llega.

@@ -112,10 +112,14 @@ def sumar_costo(slug: str, usd: float):
 
 # ── Lectura de lo que producen los pasos ────────────────────────────────
 
-def variantes(slug: str) -> list:
+def variantes(slug: str, base_url: str = "") -> list:
     """
     Las variantes de imagen del paso 1, leídas de los NNN.json que escribe
     imagen.py. Se devuelven en el formato del contrato de la API.
+
+    La `url` es parte del contrato: sin ella, el plugin descarta la variante y
+    la pausa de aprobación queda sin nada que mostrar. Apunta a la ruta de
+    archivos del servicio, que exige la misma firma HMAC que el resto.
     """
     carpeta = carpeta_pruebas(slug)
     if not carpeta.exists():
@@ -136,6 +140,7 @@ def variantes(slug: str) -> list:
         salida.append({
             "id": f.stem,                       # "007"
             "archivo": archivo,
+            "url": f"{base_url}/files/{slug}/variantes/{archivo}",
             "vista": d.get("vista", ""),
             "fondo": d.get("fondo", ""),
             "qc": (d.get("qc") or {}).get("veredicto", ""),
@@ -242,7 +247,7 @@ def snapshot(slug: str, base_url: str) -> dict:
         "job_id": slug,
         "estado": estado,
         "candidatos": candidatos(slug) if estado == "choosing" else [],
-        "variantes": variantes(slug) if estado in ("reviewing", "imaging") else [],
+        "variantes": variantes(slug, base_url) if estado in ("reviewing", "imaging") else [],
         "categoria": d.get("categoria", ""),
         "colocacion": d.get("colocacion", "piso"),
         "costo_usd": round(float(d.get("costo_usd", 0)), 4),

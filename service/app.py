@@ -57,6 +57,8 @@ ENTREGABLES = {
 # Los renders de control que produce Blender, si están.
 PREFIJOS_PNG = ("vista_",)
 
+# Las imágenes de variantes del paso de revisión: "001_frontal_transparente.png".
+RUTA_VARIANTE_PNG = re.compile(r"^\d{3}_[a-z-]+_[a-z]+\.png$")
 
 def url_publica() -> str:
     """URL con la que el servicio se nombra a sí mismo en las URLs de archivos."""
@@ -405,6 +407,8 @@ class Handler(BaseHTTPRequestHandler):
 
         tipo = ENTREGABLES.get(nombre)
         if not tipo and nombre.startswith(PREFIJOS_PNG) and ruta.suffix.lower() == ".png":
+            tipo = "image/png"
+        if not tipo and RUTA_VARIANTE_PNG.match(nombre):
             tipo = "image/png"
         if not tipo:
             # Se responde 404 y no 403 a propósito: para quien pregunta, un

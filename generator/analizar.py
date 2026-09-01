@@ -31,7 +31,9 @@ ordenados del más probable al menos probable. Reglas:
 - No listes paredes, piso, techo, ventanas, puertas de la habitación, cortinas, sombras
   ni el fondo.
 - No listes partes de un mismo objeto por separado (una puerta de una vitrina, un cajón,
-  un almohadón de un sofá NO son objetos aparte).
+  un almohadón de un sofá NO son objetos aparte). Esto incluye herrajes y accesorios
+  atornillados o montados en el objeto — un grifo en un mueble de cocina, tiradores,
+  bisagras: son parte del objeto, van en su "descripcion", no como candidatos aparte.
 - Sí listá los objetos decorativos que estén apoyados sobre el producto o adentro de él,
   porque a veces el producto es uno de ellos.
 - Máximo 8 objetos.

@@ -30,13 +30,23 @@ ENCUADRE = (
 
 # Cuando la foto es ambientada (el caso normal en e-commerce) hay que decir explícitamente
 # cuál de todos los objetos es el producto; si no, el modelo elige por su cuenta.
+#
+# La excepción del grifo existe porque, sin ella, un mueble de cocina salía a veces con
+# el grifo y a veces sin él: nada en el prompt distinguía "algo apoyado encima del
+# producto" (se borra) de "hardware montado en el producto" (es parte de él). El modelo
+# de imagen resolvía esa ambigüedad para cada lado según la foto, así que el resultado no
+# era consistente. Un grifo atornillado a la mesada de un mueble de cocina es lo segundo:
+# se queda, siempre, no según cómo interprete la imagen ese día.
 OBJETIVO = (
     'The product to isolate is (described in Spanish): "{objeto}". That object is the ONLY '
     "thing that may remain in the image. Delete every other object of the scene — furniture, "
     "plants, lamps, rugs, curtains, artwork, people, packaging — including anything resting "
     "on top of the product, placed inside it or standing in front of it, and rebuild the "
     "parts of the product that they were covering. Shelves, drawers and interiors must end "
-    "up empty."
+    "up empty. EXCEPTION: hardware and fixtures physically mounted onto the product itself — "
+    "a faucet/tap on a kitchen or bathroom cabinet, handles, knobs, hinges — are part of the "
+    "product, not a separate object resting on it. Never delete them; keep them exactly as "
+    "they appear in the reference, in the same position."
 )
 
 VISTAS = {

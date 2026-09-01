@@ -46,6 +46,11 @@ def parsear(argv=None):
                    help="alto de algo por encima de la pieza (p. ej. un grifo sobre un "
                         "mueble de cocina) que SÍ sale en la foto/malla pero no cuenta "
                         "como parte de --alto")
+    p.add_argument("--tiene-grifo", action="store_true",
+                   help="la pieza tiene un grifo/accesorio montado de alto desconocido. "
+                        "Sin --alto-extra, --modo se ignora y se escala en modo 'ancho': "
+                        "el alto (caja + grifo) queda librado a lo que midan ancho/largo, "
+                        "en vez de forzarlo a --alto (que es solo la caja) y achatar todo.")
     p.add_argument("--unidad", default="cm", choices=sorted(gltf_scale.UNIDADES_M))
     p.add_argument("--nombre", default="", help="nombre del producto (define la carpeta del job)")
     p.add_argument("--vistas", type=int, default=1, choices=[1, 4],
@@ -111,7 +116,8 @@ def plan(a, job: Path):
     imgs = (0 if a.imagen_limpia else 1) + (3 if a.vistas == 4 else 0)
     entran = len(a.imagen_limpia) if a.imagen_limpia else 1 + (3 if a.vistas == 4 else 0)
     usd = config.costo_imagen() * imgs
-    extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else ""
+    extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else (
+        " (tiene grifo: alto sin forzar)" if a.tiene_grifo else "")
     print(f"Job:      {job}")
     print(f"Producto: {a.alto} x {a.ancho} x {a.largo} {a.unidad} (alto x ancho x largo)"
           f"{extra_txt}")
@@ -237,7 +243,7 @@ def main(argv=None):
         "nombre": a.nombre or slug,
         "slug": slug,
         "medidas": {"alto": a.alto, "ancho": a.ancho, "largo": a.largo, "unidad": a.unidad,
-                    "alto_extra": a.alto_extra},
+                    "alto_extra": a.alto_extra, "tiene_grifo": a.tiene_grifo},
         "vistas": a.vistas,
         "ext_entrada": entrada.suffix.lower(),
         "modelos": {"imagen": config.OPENAI_IMAGE_MODEL, "malla": config.MESHY_AI_MODEL},
@@ -311,9 +317,20 @@ def main(argv=None):
     # -- 4. escala métrica
     print("  [4/6] escalando a las medidas declaradas…")
     modelo = job / "model.glb"
+    # Con --tiene-grifo y sin --alto-extra, --alto es solo la caja: no hay un alto
+    # total confiable para escalar contra él, en ningún modo (ni "exacto" ni "alto").
+    # "ancho" sí sirve de referencia — un grifo no le agrega ancho a nada — así que
+    # se fuerza ese modo pase lo que pase con --modo: escalar uniformemente por el
+    # ancho deja que el alto (caja + grifo) salga de lo que la malla ya trae, en vez
+    # de forzarlo a un número que no incluye el grifo y achatar todo para que quepa.
+    sin_alto = a.tiene_grifo and not a.alto_extra
+    modo_efectivo = "ancho" if sin_alto else a.modo
+    if sin_alto and a.modo != modo_efectivo:
+        print(f"        tiene grifo, sin alto-extra: modo '{a.modo}' -> 'ancho' "
+              f"(el alto sale de la malla, no se fuerza)")
     meta["escala"] = gltf_scale.escalar(
         crudo, modelo, a.alto, a.ancho, a.largo, a.unidad,
-        modo=a.modo, ejes_auto=not a.sin_ejes_auto, anclar=True, alto_extra=a.alto_extra)
+        modo=modo_efectivo, ejes_auto=not a.sin_ejes_auto, anclar=True, alto_extra=a.alto_extra)
     meta["archivo"] = {"glb": "model.glb", "mb": round(modelo.stat().st_size / 1e6, 2)}
     if meta["escala"]["ejes_permutados"]:
         print("        ancho/largo permutados: la malla venía girada 90° respecto a lo declarado")

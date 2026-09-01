@@ -46,6 +46,9 @@ Para cada uno:
   mueble…).
 - "es_producto_probable": true solo para el candidato o los candidatos plausibles a ser
   el producto en venta (normalmente el objeto más grande, centrado y protagonista).
+- "tiene_grifo_de_agua": true si el objeto tiene un grifo o canilla de agua montado —
+  típico de un mueble de cocina o baño con lavaplatos o lavamanos integrado —, false en
+  cualquier otro caso.
 
 "ambiguo": true si hay más de un candidato razonable a ser el producto.
 "resumen": una frase describiendo la escena completa."""
@@ -62,8 +65,10 @@ ESQUEMA = {
                     "descripcion": {"type": "string"},
                     "ubicacion": {"type": "string"},
                     "es_producto_probable": {"type": "boolean"},
+                    "tiene_grifo_de_agua": {"type": "boolean"},
                 },
-                "required": ["nombre", "descripcion", "ubicacion", "es_producto_probable"],
+                "required": ["nombre", "descripcion", "ubicacion", "es_producto_probable",
+                             "tiene_grifo_de_agua"],
                 "additionalProperties": False,
             },
         },

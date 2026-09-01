@@ -117,9 +117,42 @@ MEDIDAS = {
                      "not deeper. Do not make it look bulkier or slimmer than it is."),
 }
 
+# Para cuando la pieza tiene un accesorio de alto desconocido (--tiene-grifo) y nadie
+# declaró --alto-extra: el "alto" que se conoce es solo el de la caja, pero la foto
+# muestra la caja Y el accesorio juntos. Declarar una relación alto/ancho con ese alto
+# es la misma foto achatada que --alto-extra existe para evitar cuando SÍ se conoce esa
+# altura — acá no se conoce, así que mejor no declarar ninguna relación que dependa del
+# alto: se pide ancho/largo nomás y se deja que la foto decida el alto sola. "cenital"
+# no tiene entrada acá porque una vista desde arriba no ve el accesorio — su relación
+# (largo/ancho) sigue siendo válida tal cual, con o sin grifo.
+MEDIDAS_SIN_ALTO = {
+    "frontal": ("The real object's main body is {ancho} cm wide and {largo} cm deep. It "
+                "also has a faucet/tap (or similar fixture) mounted on top of it, whose "
+                "height is not specified — draw it at whatever height looks proportionate "
+                "in this photo. Do not stretch or compress the image to force any "
+                "particular overall height."),
+    "lateral": ("The real object's main body is {ancho} cm wide and {largo} cm deep. It "
+                "also has a faucet/tap (or similar fixture) mounted on top of it, whose "
+                "height is not specified — draw it at whatever height looks proportionate "
+                "in this photo. Do not stretch or compress the image to force any "
+                "particular overall height."),
+    "tres-cuartos": ("The real object's main body is {ancho} cm wide and {largo} cm deep. "
+                     "It also has a faucet/tap (or similar fixture) mounted on top of it, "
+                     "whose height is not specified. Do not make the body look bulkier or "
+                     "slimmer than its width/depth would suggest, and its depth must look "
+                     "like {largo} cm, not deeper."),
+}
 
-def texto_medidas(vista, alto, ancho, largo):
-    """Frase con las medidas reales (en cm) para meter en el prompt."""
+
+def texto_medidas(vista, alto, ancho, largo, tiene_grifo=False):
+    """Frase con las medidas reales (en cm) para meter en el prompt.
+
+    tiene_grifo=True (ver --tiene-grifo, sin --alto-extra): usa MEDIDAS_SIN_ALTO en vez
+    de MEDIDAS para frontal/lateral/tres-cuartos — ver el comentario ahí arriba. En
+    "cenital" no hace diferencia."""
+    if tiene_grifo and vista in MEDIDAS_SIN_ALTO:
+        return MEDIDAS_SIN_ALTO[vista].format(ancho=_num(ancho), largo=_num(largo))
+
     plantilla = MEDIDAS.get(vista)
     if not plantilla:
         return ""

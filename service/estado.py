@@ -187,6 +187,23 @@ def objeto_por_numero(slug: str, numero: int) -> str:
     return o.get("descripcion") or o.get("nombre", "")
 
 
+def grifo_por_numero(slug: str, numero: int) -> bool:
+    """¿La visión detectó un grifo de agua en el candidato que se eligió?
+
+    Complementa el check "tiene grifo" del formulario: si la persona no lo tildó (por
+    desconocimiento, o porque no se dio cuenta), esto lo agarra igual — siempre que haya
+    elegido un candidato de la lista y no escrito su propia descripción a mano.
+    """
+    f = carpeta_pruebas(slug) / "analisis.json"
+    if not f.exists():
+        return False
+    a = json.loads(f.read_text(encoding="utf-8"))
+    objetos = a.get("objetos", [])
+    if not 1 <= numero <= len(objetos):
+        return False
+    return bool(objetos[numero - 1].get("tiene_grifo_de_agua"))
+
+
 def job_pipeline(slug: str) -> dict:
     f = carpeta_job(slug) / "job.json"
     if not f.exists():

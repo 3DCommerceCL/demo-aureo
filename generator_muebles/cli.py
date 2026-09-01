@@ -41,6 +41,9 @@ def parsear(argv=None):
     p.add_argument("--alto-extra", type=float, default=0.0,
                    help="alto de algo por encima del mueble (p. ej. un grifo sobre un "
                         "mueble de cocina) que no cuenta como parte de --alto")
+    p.add_argument("--tiene-grifo", action="store_true",
+                   help="el mueble tiene un grifo/accesorio de alto desconocido. Sin "
+                        "--alto-extra, se escala por --ancho en vez de forzar --alto")
     p.add_argument("--unidad", default="cm", choices=sorted(gltf_scale.UNIDADES_M))
     p.add_argument("--categoria", default="", choices=[""] + categorias.lista(),
                    help="si no se indica, se detecta mirando la foto")
@@ -108,6 +111,8 @@ def argv_imagen(a, foto, objeto, perfil):
     if objeto:
         # ya resolvimos el objeto: que la base no vuelva a preguntar ni a pagar visión
         argv += ["--objeto", analizar.frase(objeto)]
+    if a.tiene_grifo:
+        argv += ["--tiene-grifo"]
     if perfil["nota"]:
         argv += ["--extra", perfil["nota"]]
     if a.abrir:
@@ -160,6 +165,8 @@ def main(argv=None):
         argv_pl += ["--nombre", a.nombre]
     if a.si:
         argv_pl += ["--si"]
+    if a.tiene_grifo:
+        argv_pl += ["--tiene-grifo"]
     if base_pipeline.main(argv_pl) != 0:
         return 1
 

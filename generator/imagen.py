@@ -93,6 +93,11 @@ def parsear(argv=None):
                    help="alto de algo por encima de la pieza (p. ej. un grifo sobre un "
                         "mueble de cocina) que SÍ sale en la foto pero no cuenta como "
                         "parte de --alto")
+    p.add_argument("--tiene-grifo", action="store_true",
+                   help="la pieza tiene un grifo/accesorio montado de alto desconocido. "
+                        "Sin --alto-extra para decir cuánto mide, no se fuerza ninguna "
+                        "relación alto/ancho en frontal/lateral: se deja que la foto decida "
+                        "el alto en vez de arriesgarse a achatar el grifo adentro de --alto")
     p.add_argument("--unidad", default="cm", choices=sorted(gltf_scale.UNIDADES_M))
     p.add_argument("--sin-correccion", action="store_true",
                    help="no reescalar la imagen para calzar la proporción declarada")
@@ -169,6 +174,8 @@ def comando_repetir(a, foto: Path, vista, fondo, objeto=""):
                       f"--unidad {a.unidad}")
         if a.alto_extra:
             partes.append(f"--alto-extra {a.alto_extra:g}")
+    if a.tiene_grifo:
+        partes.append("--tiene-grifo")
     if objeto:
         partes.append(f'--objeto "{objeto}"')
     if a.extra:
@@ -215,15 +222,23 @@ def procesar(a, foto: Path, slug: str):
             frase_objeto = analizar.frase(objeto)
 
     dims = medidas_cm(a)
+    # Con --tiene-grifo y SIN --alto-extra no hay forma de saber cuánto del alto
+    # declarado es la pieza y cuánto el grifo — así que en frontal/lateral (las
+    # vistas cuya proporción usa el alto) no se fuerza ninguna relación alto/ancho:
+    # forzarla con un alto que es solo el de la caja es la misma foto achatada que
+    # --alto-extra vino a resolver, para cuando SÍ se declara ese dato.
+    sin_alto = a.tiene_grifo and not a.alto_extra
     if dims:
-        extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else ""
+        extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else (
+            " (con grifo: alto sin forzar en frontal/lateral)" if sin_alto else "")
         print(f"  medidas declaradas: {a.alto:g} x {a.ancho:g} x {a.largo:g} {a.unidad} "
               f"(alto x ancho x largo){extra_txt}")
 
     n = siguiente_n(carpeta)
     for vista, fondo, _ in combos(a):
         size = elegir_lienzo(a, vista, dims)
-        texto_med = prompts.texto_medidas(vista, *dims) if dims else ""
+        sin_alto_vista = sin_alto and vista in ("frontal", "lateral")
+        texto_med = prompts.texto_medidas(vista, *dims, tiene_grifo=sin_alto_vista) if dims else ""
         prompt = prompts.construir(vista, fondo, a.extra, frase_objeto, texto_med)
         if a.dry_run:
             print(f"\n  #{n:03d} vista={vista} fondo={fondo} quality={a.quality} size={size}"
@@ -243,7 +258,7 @@ def procesar(a, foto: Path, slug: str):
             continue
         # la silueta manda: Meshy va a copiar esta proporción a la malla
         ajuste = None
-        if dims and not a.sin_correccion:
+        if dims and not a.sin_correccion and not sin_alto_vista:
             objetivo_rel = proporcion.objetivo(vista, *dims)
             if objetivo_rel:
                 crudo = ruta.with_name(ruta.stem + "_crudo.png")

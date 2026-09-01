@@ -203,6 +203,10 @@ def analizar_foto(slug: str, base_url: str, foto: Path):
     if len(objetos) == 1 or (not analisis.get("ambiguo") and len(probables) == 1):
         elegido = (probables or objetos)[0]
         d["objeto"] = elegido.get("descripcion") or elegido.get("nombre", "")
+        # Igual que en _elegir(): la visión puede detectar el grifo sola, aunque la
+        # persona no haya tildado el check al crear el trabajo.
+        medidas = d.setdefault("medidas", {})
+        medidas["tiene_grifo"] = bool(medidas.get("tiene_grifo")) or bool(elegido.get("tiene_grifo_de_agua"))
         estado.escribir(slug, d)
         _log(slug, f"producto único: {elegido.get('nombre')}")
         estado.poner_estado(slug, "imaging")
@@ -241,6 +245,8 @@ def generar_imagen(slug: str, base_url: str, vista="frontal", fondo="transparent
     # nunca podría responderse.
     if d.get("objeto"):
         argv += ["--objeto", d["objeto"]]
+    if med.get("tiene_grifo"):
+        argv += ["--tiene-grifo"]
     if extra:
         argv += ["--extra", extra]
 
@@ -288,6 +294,8 @@ def reconstruir(slug: str, base_url: str, variante: str, modo: str):
         "--web",   # produce model_web.glb, que es el archivo que importa el plugin
         "--si",    # el gasto ya lo aprobó una persona en WordPress
     ]
+    if med.get("tiene_grifo"):
+        argv += ["--tiene-grifo"]
     # Sin --blender a propósito: no está disponible en el contenedor. Se pierde
     # la segunda medición y su USDZ; model-viewer genera el USDZ al vuelo.
 
@@ -322,6 +330,8 @@ def rehacer(slug: str, base_url: str, desde: str):
         "--forzar", desde,
         "--web", "--si",
     ]
+    if med.get("tiene_grifo"):
+        argv += ["--tiene-grifo"]
     if limpia:
         argv += ["--imagen-limpia", str(limpia)]
 

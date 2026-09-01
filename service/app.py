@@ -280,6 +280,11 @@ class Handler(BaseHTTPRequestHandler):
                 # cuenta como parte de "alto". Opcional: 0 si no aplica.
                 "alto_extra": float(campo("alto_extra", "0")),
                 "unidad": campo("unidad", "cm"),
+                # Check del formulario: la persona ya sabe que tiene grifo, sin haber
+                # medido su alto. No es la única fuente — la visión (paso 0) también
+                # puede detectarlo sola y lo suma acá si esto vino en falso (ver
+                # grifo_por_numero() en estado.py y analizar_foto()/_elegir()).
+                "tiene_grifo": campo("tiene_grifo", "0") in ("1", "true", "on"),
             }
         except ValueError:
             return self._error(400, "Las medidas tienen que ser números.")
@@ -358,14 +363,22 @@ class Handler(BaseHTTPRequestHandler):
         if estado.leer(slug).get("estado") != "choosing":
             return self._error(409, "Este trabajo no está esperando que elijas el producto.")
 
+        candidato_num = int(datos.get("candidato") or 0)
         objeto = str(datos.get("objeto") or "").strip()
+        # Solo hay un candidato de la lista (con su propio análisis de visión) para mirar
+        # cuando se eligió por número. Si la persona escribió su propia descripción a
+        # mano, no hay nada que la visión ya haya mirado para ese texto: el check del
+        # formulario queda como única fuente para ese caso.
+        detectado = estado.grifo_por_numero(slug, candidato_num) if not objeto else False
         if not objeto:
-            objeto = estado.objeto_por_numero(slug, int(datos.get("candidato") or 0))
+            objeto = estado.objeto_por_numero(slug, candidato_num)
         if not objeto:
             return self._error(400, "Hay que indicar cuál de los objetos es el producto.")
 
         d = estado.leer(slug)
         d["objeto"] = objeto
+        medidas = d.setdefault("medidas", {})
+        medidas["tiene_grifo"] = bool(medidas.get("tiene_grifo")) or detectado
         estado.escribir(slug, d)
 
         # Síncrono y ANTES de lanzar el hilo. lanzar_imagen() arranca un hilo que

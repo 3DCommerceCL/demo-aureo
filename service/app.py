@@ -368,6 +368,14 @@ class Handler(BaseHTTPRequestHandler):
         d["objeto"] = objeto
         estado.escribir(slug, d)
 
+        # Síncrono y ANTES de lanzar el hilo. lanzar_imagen() arranca un hilo que
+        # recién ahí adentro pasa el estado a "imaging" — pero ese hilo puede no
+        # haber corrido ni una línea cuando esta función ya está armando la
+        # respuesta de más abajo. Sin este cambio síncrono, la instantánea que
+        # WordPress sincroniza todavía decía "choosing" (la pausa que la persona
+        # ACABA de resolver), y la pantalla volvía a mostrar la misma pregunta
+        # hasta que el sondeo del navegador la corregía unos segundos después.
+        estado.poner_estado(slug, "imaging")
         ejecutor.lanzar_imagen(slug, url_publica())
         self._json(200, estado.snapshot(slug, url_publica()))
 
@@ -375,6 +383,7 @@ class Handler(BaseHTTPRequestHandler):
         if estado.leer(slug).get("estado") not in ("reviewing", "imaging"):
             return self._error(409, "Este trabajo no está en la etapa de la imagen.")
 
+        estado.poner_estado(slug, "imaging")  # ver _elegir(): evita la misma carrera.
         ejecutor.lanzar_imagen(
             slug, url_publica(),
             vista=str(datos.get("vista") or "frontal"),
@@ -409,6 +418,12 @@ class Handler(BaseHTTPRequestHandler):
         d["modo"] = modo
         estado.escribir(slug, d)
 
+        # Síncrono y ANTES de lanzar el hilo — acá es donde más importa. Con la
+        # misma carrera que en _elegir(), un doble clic (o un reintento del
+        # plugin) dentro de esa ventana pasaba el chequeo de estado de arriba
+        # DOS veces, porque la instantánea todavía decía "reviewing": compraba
+        # la reconstrucción dos veces, 60 créditos por una.
+        estado.poner_estado(slug, "meshing")
         ejecutor.lanzar_reconstruccion(slug, url_publica(), variante, modo)
         self._json(200, estado.snapshot(slug, url_publica()))
 
@@ -417,6 +432,11 @@ class Handler(BaseHTTPRequestHandler):
         if desde not in ("imagen", "vistas", "malla", "escala", "blender", "web"):
             return self._error(400, "Ese paso no se puede rehacer.")
 
+        # Síncrono y ANTES de lanzar el hilo: misma razón que en los otros tres
+        # extremos. PASO_A_ESTADO es el mismo mapeo que usa rehacer() adentro
+        # del hilo, para que la instantánea de esta respuesta ya diga lo mismo
+        # que va a terminar diciendo el hilo.
+        estado.poner_estado(slug, ejecutor.PASO_A_ESTADO.get(desde, "finishing"))
         ejecutor.lanzar_rehacer(slug, url_publica(), desde)
         self._json(200, estado.snapshot(slug, url_publica()))
 

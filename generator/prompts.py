@@ -49,6 +49,20 @@ OBJETIVO = (
     "they appear in the reference, in the same position."
 )
 
+# Recordatorio del hardware montado, repetido AL FINAL del prompt, después de la
+# corrección libre que escribe el vendedor (--extra / "Corregir algo que entendió
+# mal"). La excepción de OBJETIVO ya dice que no se borra, pero queda en la mitad
+# del prompt; --extra va al final, y un pedido como "saca el mueble de arriba" se
+# llevaba puesto el grifo también, porque el modelo de edición le da más peso a lo
+# último que lee. Repetirlo después de --extra es lo que lo protege de una
+# corrección que ni siquiera lo menciona.
+RECORDATORIO_HARDWARE = (
+    "Whatever the correction above asks for, it never includes removing hardware "
+    "mounted on the product — a faucet/tap, handles, knobs, hinges. If the product has "
+    "one, it must still be there afterwards, unchanged, no matter what else that "
+    "correction changes."
+)
+
 VISTAS = {
     "frontal": (
         "Straight-on front elevation view: the camera is exactly at the object's "
@@ -138,6 +152,7 @@ def construir(vista="frontal", fondo="blanco", extra="", objeto="", medidas=""):
     partes += [ENCUADRE, FIDELIDAD]
     if extra:
         partes.append(extra)
+        partes.append(RECORDATORIO_HARDWARE)
     return " ".join(partes)
 
 
@@ -154,6 +169,7 @@ def construir_vista_extra(nombre, grados, fondo="blanco", extra=""):
     ]
     if extra:
         partes.append(extra)
+        partes.append(RECORDATORIO_HARDWARE)
     return " ".join(partes)
 
 

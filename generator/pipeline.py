@@ -42,6 +42,10 @@ def parsear(argv=None):
     p.add_argument("--alto", type=float, required=True)
     p.add_argument("--ancho", type=float, required=True)
     p.add_argument("--largo", type=float, required=True)
+    p.add_argument("--alto-extra", type=float, default=0.0,
+                   help="alto de algo por encima de la pieza (p. ej. un grifo sobre un "
+                        "mueble de cocina) que SÍ sale en la foto/malla pero no cuenta "
+                        "como parte de --alto")
     p.add_argument("--unidad", default="cm", choices=sorted(gltf_scale.UNIDADES_M))
     p.add_argument("--nombre", default="", help="nombre del producto (define la carpeta del job)")
     p.add_argument("--vistas", type=int, default=1, choices=[1, 4],
@@ -107,8 +111,10 @@ def plan(a, job: Path):
     imgs = (0 if a.imagen_limpia else 1) + (3 if a.vistas == 4 else 0)
     entran = len(a.imagen_limpia) if a.imagen_limpia else 1 + (3 if a.vistas == 4 else 0)
     usd = config.costo_imagen() * imgs
+    extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else ""
     print(f"Job:      {job}")
-    print(f"Producto: {a.alto} x {a.ancho} x {a.largo} {a.unidad} (alto x ancho x largo)")
+    print(f"Producto: {a.alto} x {a.ancho} x {a.largo} {a.unidad} (alto x ancho x largo)"
+          f"{extra_txt}")
     if a.imagen_limpia:
         print(f"Paso 1:   {len(a.imagen_limpia)} imagen(es) ya aprobada(s) "
               f"({', '.join(Path(r).name for r in a.imagen_limpia)}) — US$ 0")
@@ -230,7 +236,8 @@ def main(argv=None):
     meta.update({
         "nombre": a.nombre or slug,
         "slug": slug,
-        "medidas": {"alto": a.alto, "ancho": a.ancho, "largo": a.largo, "unidad": a.unidad},
+        "medidas": {"alto": a.alto, "ancho": a.ancho, "largo": a.largo, "unidad": a.unidad,
+                    "alto_extra": a.alto_extra},
         "vistas": a.vistas,
         "ext_entrada": entrada.suffix.lower(),
         "modelos": {"imagen": config.OPENAI_IMAGE_MODEL, "malla": config.MESHY_AI_MODEL},
@@ -306,7 +313,7 @@ def main(argv=None):
     modelo = job / "model.glb"
     meta["escala"] = gltf_scale.escalar(
         crudo, modelo, a.alto, a.ancho, a.largo, a.unidad,
-        modo=a.modo, ejes_auto=not a.sin_ejes_auto, anclar=True)
+        modo=a.modo, ejes_auto=not a.sin_ejes_auto, anclar=True, alto_extra=a.alto_extra)
     meta["archivo"] = {"glb": "model.glb", "mb": round(modelo.stat().st_size / 1e6, 2)}
     if meta["escala"]["ejes_permutados"]:
         print("        ancho/largo permutados: la malla venía girada 90° respecto a lo declarado")

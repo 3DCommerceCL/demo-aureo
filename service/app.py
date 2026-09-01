@@ -275,6 +275,10 @@ class Handler(BaseHTTPRequestHandler):
                 "alto": float(campo("alto", "0")),
                 "ancho": float(campo("ancho", "0")),
                 "largo": float(campo("largo", "0")),
+                # Alto de algo por encima de la pieza (un grifo sobre un mueble de
+                # cocina, por ejemplo) que sí sale en la foto pero que la persona no
+                # cuenta como parte de "alto". Opcional: 0 si no aplica.
+                "alto_extra": float(campo("alto_extra", "0")),
                 "unidad": campo("unidad", "cm"),
             }
         except ValueError:
@@ -286,6 +290,9 @@ class Handler(BaseHTTPRequestHandler):
                 "Hacen falta las tres medidas reales del producto. Son lo que "
                 "permite que el modelo se vea del tamaño correcto en AR."
             )
+
+        if medidas["alto_extra"] < 0:
+            return self._error(400, "El alto agregado no puede ser negativo.")
 
         carpeta = estado.carpeta_job(slug)
         carpeta.mkdir(parents=True, exist_ok=True)

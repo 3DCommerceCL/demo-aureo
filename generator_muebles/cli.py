@@ -38,6 +38,9 @@ def parsear(argv=None):
     p.add_argument("--alto", type=float, required=True, help="medida de catálogo")
     p.add_argument("--ancho", type=float, required=True)
     p.add_argument("--largo", type=float, required=True, help="fondo/profundidad")
+    p.add_argument("--alto-extra", type=float, default=0.0,
+                   help="alto de algo por encima del mueble (p. ej. un grifo sobre un "
+                        "mueble de cocina) que no cuenta como parte de --alto")
     p.add_argument("--unidad", default="cm", choices=sorted(gltf_scale.UNIDADES_M))
     p.add_argument("--categoria", default="", choices=[""] + categorias.lista(),
                    help="si no se indica, se detecta mirando la foto")
@@ -86,8 +89,9 @@ def resolver(a):
 
     print(f"\n  Categoría: {categoria} ({origen}, confianza {confianza:.0%})")
     print(f"  Colocación en AR: {perfil['colocacion']} -> ar-placement=\"{perfil['ar_placement']}\"")
+    extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else ""
     print(f"  Vista {perfil['vista']} · fondo {perfil['fondo']} · escala {perfil['modo']} "
-          f"· medidas {a.alto:g} x {a.ancho:g} x {a.largo:g} {a.unidad}")
+          f"· medidas {a.alto:g} x {a.ancho:g} x {a.largo:g} {a.unidad}{extra_txt}")
     if perfil["nota"]:
         print(f"  Nota de categoría: {perfil['nota']}")
     return foto, slug, carpeta, objeto, perfil
@@ -97,6 +101,7 @@ def argv_imagen(a, foto, objeto, perfil):
     argv = ["--imagen", str(foto),
             "--vista", perfil["vista"], "--fondo", perfil["fondo"],
             "--alto", f"{a.alto:g}", "--ancho", f"{a.ancho:g}", "--largo", f"{a.largo:g}",
+            "--alto-extra", f"{a.alto_extra:g}",
             "--unidad", a.unidad, "--quality", a.quality]
     if a.nombre:
         argv += ["--nombre", a.nombre]
@@ -147,7 +152,8 @@ def main(argv=None):
 
     print("\n== pasos 2-6: modelo 3D ==")
     argv_pl = ["--imagen", str(foto), "--alto", f"{a.alto:g}", "--ancho", f"{a.ancho:g}",
-               "--largo", f"{a.largo:g}", "--unidad", a.unidad,
+               "--largo", f"{a.largo:g}", "--alto-extra", f"{a.alto_extra:g}",
+               "--unidad", a.unidad,
                "--imagen-limpia", str(limpia), "--modo", perfil["modo"],
                "--blender", "--web"]
     if a.nombre:

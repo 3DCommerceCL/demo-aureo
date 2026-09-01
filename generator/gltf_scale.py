@@ -175,7 +175,7 @@ def _factores(tam, objetivo, modo, mapeo):
 
 
 def escalar(entrada: Path, salida: Path, alto, ancho, largo, unidad="cm",
-            modo="uniforme", ejes_auto=True, anclar=True):
+            modo="uniforme", ejes_auto=True, anclar=True, alto_extra=0.0):
     """
     alto/ancho/largo en `unidad`. Devuelve un dict con el informe del ajuste.
       modo: uniforme (default, no deforma) | exacto (por eje, calza clavado pero deforma)
@@ -183,9 +183,20 @@ def escalar(entrada: Path, salida: Path, alto, ancho, largo, unidad="cm",
       ejes_auto: si el ancho/largo de la malla están intercambiados respecto a lo declarado,
                  los permuta (el frente que ve Meshy no siempre queda en -Z).
       anclar: deja el origen en el centro de la base (apoyo en el piso para AR).
+      alto_extra: alto de algo que sobresale por encima de la pieza y SÍ está en la
+                  malla (un grifo sobre un mueble de cocina, por ejemplo), pero que la
+                  persona no cuenta como parte de `alto`. La malla entera (pieza +
+                  agregado) es lo que de verdad mide `alto + alto_extra` en la realidad;
+                  escalar solo por `alto` comprime también la pieza para que el conjunto
+                  entero quepa en una medida pensada solo para ella. Por eso el target
+                  real del eje Y es la suma, y `alto` queda para la pieza sola.
     """
+    if alto_extra < 0:
+        raise ValueError("La medida 'alto_extra' no puede ser negativa")
+
     factor = UNIDADES_M[unidad]
-    objetivo_m = {"alto": alto * factor, "ancho": ancho * factor, "largo": largo * factor}
+    alto_total = alto + alto_extra
+    objetivo_m = {"alto": alto_total * factor, "ancho": ancho * factor, "largo": largo * factor}
     for k, v in objetivo_m.items():
         if v <= 0:
             raise ValueError(f"La medida '{k}' debe ser > 0")
@@ -236,6 +247,10 @@ def escalar(entrada: Path, salida: Path, alto, ancho, largo, unidad="cm",
     informe = {
         "modo": modo,
         "unidad": unidad,
+        # objetivo_m/medido_m/error_pct del eje "alto" son de la pieza + alto_extra
+        # juntos (lo único que la malla puede medir): alto_extra_m separado es lo que
+        # permite reconstruir cuánto de eso era la pieza sola.
+        "alto_extra_m": round(alto_extra * factor, 6),
         "objetivo_m": {k: round(v, 6) for k, v in objetivo_m.items()},
         "medido_m": {n: round(medido[e], 6) for n, e in mapeo.items()},
         "escala": [round(s, 8) for s in escala],
@@ -256,6 +271,9 @@ def _cli():
     p.add_argument("--alto", type=float, required=True)
     p.add_argument("--ancho", type=float, required=True)
     p.add_argument("--largo", type=float, required=True)
+    p.add_argument("--alto-extra", type=float, default=0.0,
+                   help="alto de algo por encima de la pieza (p. ej. un grifo) que no "
+                        "cuenta como parte de --alto pero sí está en la malla")
     p.add_argument("--unidad", default="cm", choices=sorted(UNIDADES_M))
     p.add_argument("--modo", default="uniforme",
                    choices=["uniforme", "exacto", "alto", "ancho", "largo"])
@@ -263,7 +281,7 @@ def _cli():
     p.add_argument("--sin-anclar", action="store_true")
     a = p.parse_args()
     informe = escalar(Path(a.entrada), Path(a.salida), a.alto, a.ancho, a.largo, a.unidad,
-                      a.modo, not a.sin_ejes_auto, not a.sin_anclar)
+                      a.modo, not a.sin_ejes_auto, not a.sin_anclar, alto_extra=a.alto_extra)
     print(json.dumps(informe, indent=2, ensure_ascii=False))
 
 

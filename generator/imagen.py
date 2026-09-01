@@ -40,11 +40,17 @@ LIENZOS = {"1024x1024": 1.0, "1024x1536": 1.5, "1536x1024": 1 / 1.5}
 
 
 def medidas_cm(a):
-    """(alto, ancho, largo) en cm, o None si el usuario no las declaró."""
+    """(alto, ancho, largo) TOTALES en cm, para corregir la proporción de la silueta,
+    o None si el usuario no las declaró.
+
+    `alto` ya incluye --alto-extra: la silueta de la foto muestra la pieza Y lo que
+    tenga encima (un grifo, por ejemplo), así que la proporción real a la que hay que
+    corregir la imagen es la del conjunto entero, no solo la de la pieza. Ver
+    --alto-extra."""
     if not (a.alto and a.ancho and a.largo):
         return None
     f = gltf_scale.UNIDADES_M[a.unidad] * 100.0
-    return a.alto * f, a.ancho * f, a.largo * f
+    return (a.alto + a.alto_extra) * f, a.ancho * f, a.largo * f
 
 
 def elegir_lienzo(a, vista, dims):
@@ -83,6 +89,10 @@ def parsear(argv=None):
     p.add_argument("--alto", type=float, default=0.0, help="medida real (para la proporción)")
     p.add_argument("--ancho", type=float, default=0.0)
     p.add_argument("--largo", type=float, default=0.0, help="profundidad real")
+    p.add_argument("--alto-extra", type=float, default=0.0,
+                   help="alto de algo por encima de la pieza (p. ej. un grifo sobre un "
+                        "mueble de cocina) que SÍ sale en la foto pero no cuenta como "
+                        "parte de --alto")
     p.add_argument("--unidad", default="cm", choices=sorted(gltf_scale.UNIDADES_M))
     p.add_argument("--sin-correccion", action="store_true",
                    help="no reescalar la imagen para calzar la proporción declarada")
@@ -157,6 +167,8 @@ def comando_repetir(a, foto: Path, vista, fondo, objeto=""):
     if a.alto and a.ancho and a.largo:
         partes.append(f"--alto {a.alto:g} --ancho {a.ancho:g} --largo {a.largo:g} "
                       f"--unidad {a.unidad}")
+        if a.alto_extra:
+            partes.append(f"--alto-extra {a.alto_extra:g}")
     if objeto:
         partes.append(f'--objeto "{objeto}"')
     if a.extra:
@@ -204,8 +216,9 @@ def procesar(a, foto: Path, slug: str):
 
     dims = medidas_cm(a)
     if dims:
-        print(f"  medidas declaradas: {dims[0]:.0f} x {dims[1]:.0f} x {dims[2]:.0f} cm "
-              f"(alto x ancho x largo)")
+        extra_txt = f" + {a.alto_extra:g} {a.unidad} de alto agregado" if a.alto_extra else ""
+        print(f"  medidas declaradas: {a.alto:g} x {a.ancho:g} x {a.largo:g} {a.unidad} "
+              f"(alto x ancho x largo){extra_txt}")
 
     n = siguiente_n(carpeta)
     for vista, fondo, _ in combos(a):

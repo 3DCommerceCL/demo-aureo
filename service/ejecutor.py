@@ -27,6 +27,22 @@ def _log(slug, *partes):
     print(f"[{slug}]", *partes, flush=True)
 
 
+# En qué estado queda un trabajo según el paso que se está rehaciendo. Los
+# nombres de los pasos son los de `pipeline.PASOS` / `--forzar`.
+PASO_A_ESTADO = {
+    "imagen": "imaging",
+    "vistas": "imaging",
+    "malla": "meshing",
+    "escala": "finishing",
+    "blender": "finishing",
+    "web": "finishing",
+}
+
+# Estados en los que hay —o debería haber— un hilo trabajando. Si el proceso
+# acaba de arrancar, por definición no lo hay: nadie sobrevive a un reinicio.
+ESTADOS_EN_CURSO = ("analyzing", "imaging", "meshing", "finishing")
+
+
 # ── Aviso a WordPress ───────────────────────────────────────────────────
 
 def avisar(slug: str, base_url: str):
@@ -57,6 +73,68 @@ def avisar(slug: str, base_url: str):
         _log(slug, f"callback rechazado: HTTP {e.code}")
     except Exception as e:  # red caída, sitio inalcanzable, DNS…
         _log(slug, f"callback no llegó: {e}")
+
+
+def reconciliar(base_url: str):
+    """
+    Al arrancar, ningún trabajo puede quedar anunciando un paso que ya no corre.
+
+    Los pasos viven en hilos de ESTE proceso. Si el contenedor se reinicia a
+    mitad de uno —un despliegue, un OOM, el reinicio automático de la
+    plataforma— el hilo muere, pero `service.json` conserva el último estado que
+    alcanzó a escribirse. Nadie lo vuelve a tocar nunca: el trabajo queda para
+    siempre en "meshing" o en "finishing", WordPress lo sondea eternamente y la
+    pantalla muestra un spinner sobre un paso que no existe. Ese es exactamente
+    el síntoma de "quedó en «Ajustando medidas y exportando» y nunca avanzó".
+
+    Acá se cierra el caso, con el mismo criterio que usa el servicio de merch:
+    si los archivos están, el trabajo se da por terminado (la malla ya se pagó y
+    tirarla serían 30 créditos a la basura); si no, se marca como fallido con un
+    mensaje que explica qué pasó, para que la persona pueda rehacerlo desde el
+    paso que corresponda —desde la escala o la compresión no cuesta nada—.
+
+    -> (rescatados, marcados_fallidos)
+    """
+    rescatados, fallidos = 0, 0
+
+    if not config.JOBS_DIR.exists():
+        return 0, 0
+
+    for marca in sorted(config.JOBS_DIR.glob("*/service.json")):
+        slug = marca.parent.name
+        d = estado.leer(slug)
+
+        if d.get("estado") not in ESTADOS_EN_CURSO:
+            continue
+
+        if estado.entregables(slug, base_url):
+            estado.poner_estado(slug, "done")
+            rescatados += 1
+            _log(slug, "reconciliado: los entregables ya estaban, se da por terminado")
+        else:
+            estado.poner_estado(slug, "failed", _MENSAJE_REINICIO)
+            fallidos += 1
+            _log(slug, f"reconciliado: se reinició durante «{d.get('estado')}», queda fallido")
+
+        # Se avisa igual que en cualquier otro cambio de estado: si el sitio es
+        # alcanzable se entera al instante, y si no, lo verá en su reconciliación.
+        avisar(slug, base_url)
+
+    if rescatados or fallidos:
+        print(
+            f"reconciliación: {rescatados} rescatado(s), {fallidos} marcado(s) como fallidos",
+            flush=True,
+        )
+
+    return rescatados, fallidos
+
+
+_MENSAJE_REINICIO = (
+    "El servicio de generación se reinició mientras este trabajo estaba en "
+    "curso y el paso quedó a medias. Lo que ya se había generado se conserva: "
+    "rehacer desde el ajuste de medidas o desde la compresión para web "
+    "reutiliza la reconstrucción 3D y no vuelve a gastar créditos."
+)
 
 
 def _en_hilo(fn, slug, base_url, *args):
@@ -156,6 +234,7 @@ def generar_imagen(slug: str, base_url: str, vista="frontal", fondo="transparent
         "--alto", str(med.get("alto", 0)),
         "--ancho", str(med.get("ancho", 0)),
         "--largo", str(med.get("largo", 0)),
+        "--alto-extra", str(med.get("alto_extra", 0)),
         "--unidad", med.get("unidad", "cm"),
     ]
     # --objeto salta la pregunta interactiva del paso 0, que en un servicio
@@ -202,6 +281,7 @@ def reconstruir(slug: str, base_url: str, variante: str, modo: str):
         "--alto", str(med.get("alto", 0)),
         "--ancho", str(med.get("ancho", 0)),
         "--largo", str(med.get("largo", 0)),
+        "--alto-extra", str(med.get("alto_extra", 0)),
         "--unidad", med.get("unidad", "cm"),
         "--imagen-limpia", str(limpia),
         "--modo", modo,
@@ -220,7 +300,10 @@ def reconstruir(slug: str, base_url: str, variante: str, modo: str):
 
 def rehacer(slug: str, base_url: str, desde: str):
     _log(slug, f"rehaciendo desde: {desde}")
-    estado.poner_estado(slug, "meshing" if desde == "malla" else "finishing")
+    # El estado tiene que decir en qué se está trabajando de verdad: rehacer la
+    # imagen anunciándolo como "Ajustando medidas y exportando" deja a quien
+    # mira la pantalla esperando el final de un paso que ni siquiera empezó.
+    estado.poner_estado(slug, PASO_A_ESTADO.get(desde, "finishing"))
     avisar(slug, base_url)
 
     d = estado.leer(slug)
@@ -233,6 +316,7 @@ def rehacer(slug: str, base_url: str, desde: str):
         "--alto", str(med.get("alto", 0)),
         "--ancho", str(med.get("ancho", 0)),
         "--largo", str(med.get("largo", 0)),
+        "--alto-extra", str(med.get("alto_extra", 0)),
         "--unidad", med.get("unidad", "cm"),
         "--modo", d.get("modo", "exacto"),
         "--forzar", desde,

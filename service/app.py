@@ -398,11 +398,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _servir_archivo(self, slug, nombre):
         # El nombre ya viene acotado por la expresión de la ruta (sin barras ni
-        # puntos dobles), pero se resuelve y se comprueba igual que quede dentro
-        # de la carpeta del trabajo.
-        carpeta = estado.carpeta_job(slug).resolve()
-        ruta = (carpeta / nombre).resolve()
-        if not str(ruta).startswith(str(carpeta)) or not ruta.is_file():
+        # puntos dobles). Los entregables finales viven en la carpeta del
+        # trabajo, pero las variantes de imagen las guarda imagen.py en la
+        # carpeta de pruebas — dos carpetas distintas para el mismo /files/.
+        ruta = None
+        for base in (estado.carpeta_job(slug), estado.carpeta_pruebas(slug)):
+            carpeta = base.resolve()
+            candidata = (carpeta / nombre).resolve()
+            if str(candidata).startswith(str(carpeta)) and candidata.is_file():
+                ruta = candidata
+                break
+
+        if ruta is None:
             return self._error(404, "Ese archivo no existe.")
 
         tipo = ENTREGABLES.get(nombre)
@@ -421,7 +428,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(datos)))
         self.end_headers()
         self.wfile.write(datos)
-
 
 def main():
     # El pipeline escribe su progreso con caracteres como "≈" y "→". Si la

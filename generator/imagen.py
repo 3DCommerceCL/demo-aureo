@@ -26,8 +26,10 @@ Nada se sobrescribe: cada corrida agrega intentos nuevos.
 import argparse
 import json
 import math
+import re
 import sys
 import time
+import unicodedata
 import webbrowser
 from pathlib import Path
 
@@ -121,8 +123,11 @@ def parsear(argv=None):
 
 
 def slugificar(texto):
-    import re
-    return re.sub(r"[^a-z0-9]+", "-", texto.lower().strip()).strip("-") or "producto"
+    """Mismo criterio que service.estado.slugificar, para que las carpetas coincidan:
+    sin la normalización NFKD, un nombre con tilde o ñ cae en una carpeta distinta a la
+    que usa el resto del servicio, y la variante generada queda invisible para siempre."""
+    t = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", t.lower().strip()).strip("-") or "producto"
 
 
 def es_url(texto):

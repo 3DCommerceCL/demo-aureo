@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 from pathlib import Path
 
 from . import config, gltf_scale, image_prep, meshy, net, preview, prompts
@@ -31,7 +32,11 @@ PASOS = ["imagen", "vistas", "malla", "escala", "blender", "web"]
 
 
 def slugificar(texto: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", texto.lower().strip())
+    """Mismo criterio que service.estado.slugificar, para que las carpetas coincidan:
+    sin la normalización NFKD, un nombre con tilde o ñ cae en una carpeta distinta a la
+    que usa el resto del servicio, y el modelo terminado queda invisible para siempre."""
+    t = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    s = re.sub(r"[^a-z0-9]+", "-", t.lower().strip())
     return s.strip("-") or "modelo"
 
 

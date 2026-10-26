@@ -13,10 +13,11 @@ Variables:
     AUREO_SHARED_KEY   clave HMAC compartida con WordPress   (obligatoria)
     OPENAI_API_KEY     pasos 0-1                              (obligatoria)
     MESHY_API_KEY      paso 3                                 (obligatoria)
-    GEN3D_JOBS_DIR     carpeta de trabajos  → volumen         (recomendada)
-    GEN3D_PRUEBAS_DIR  carpeta de variantes → volumen         (recomendada)
-    PORT               puerto a escuchar    (lo inyecta Railway)
-    PUBLIC_URL         URL pública del servicio, para armar las de los archivos
+    GEN3D_JOBS_DIR     carpeta de trabajos  → disco persistente (recomendada)
+    GEN3D_PRUEBAS_DIR  carpeta de variantes → disco persistente (recomendada)
+    PORT               puerto a escuchar    (por defecto 8080, lo pone nginx)
+    PUBLIC_URL         URL pública del servicio (dominio HTTPS de la VPS),
+                        para armar las de los archivos y el callback
 
 Se usa http.server de la biblioteca estándar a propósito: el servicio atiende
 pocas peticiones y así el despliegue no arrastra un framework más. Cambiarlo por
@@ -70,10 +71,7 @@ def url_publica() -> str:
     u = config.var("PUBLIC_URL").rstrip("/")
     if u:
         return u
-    # Railway expone el dominio generado en esta variable.
-    dominio = config.var("RAILWAY_PUBLIC_DOMAIN")
-    if dominio:
-        return f"https://{dominio}"
+    # Sin PUBLIC_URL (solo en local, detrás de nginx siempre hay que ponerla).
     return f"http://127.0.0.1:{os.environ.get('PORT', '8080')}"
 
 

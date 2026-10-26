@@ -32,3 +32,6 @@ training/data_angles/
 generator/.env
 generator/jobs/
 generator/pruebas/
+
+# servicio HTTP del generador (claves reales de la VPS)
+service/.env
